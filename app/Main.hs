@@ -1,6 +1,9 @@
 module Main where
 
+import Control.Concurrent (threadDelay)
 import Data.List.Split (chunksOf)
+import System.Process (system)
+import System.Random
 
 main :: IO ()
 main = do
@@ -55,7 +58,10 @@ type Game = (Board, Snake)
 initBoard :: Int -> Int -> Board
 initBoard width height =
     Board
-        (width, height, replaceNth 6 Food ((replicate (width * height) Empty)))
+        ( width
+        , height
+        , (replaceNth 9 Food . replaceNth 6 Food)
+              ((replicate (width * height) Empty)))
 
 initSnake :: Snake
 initSnake = (R, [(2, 0), (1, 0), (0, 0)])
@@ -129,7 +135,10 @@ isOutOfBounds ((Board (width, height, _)), (_, (x, y):_)) =
 
 update :: Game -> IO ()
 update (board@(Board (width, height, spaces)), snake) = do
+    system "clear"
     print $ positionSnakeOnBoard board snake
+    threadDelay 100000
+    g <- newStdGen
     let newSnake@(dir, snakeHead@(x, y):body) = updateSnake (board, snake) False
         headPosition = partPosition snakeHead
         spaceAtHead = spaces !! headPosition
@@ -142,5 +151,14 @@ update (board@(Board (width, height, spaces)), snake) = do
                           ( Board
                                 ( width
                                 , height
-                                , replaceNth headPosition Empty spaces)
+                                , ((if gotFood
+                                        then replaceNth
+                                                 (fst $
+                                                  randomR
+                                                      (0, width * height - 1)
+                                                      g)
+                                                 Food
+                                        else id) .
+                                   replaceNth headPosition Empty)
+                                      spaces)
                           , (updateSnake (board, snake) gotFood))
