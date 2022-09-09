@@ -70,10 +70,10 @@ initBoard width height =
     innerSegment = [Wall] ++ replicate (width - 2) Empty ++ [Wall]
 
 initSnake :: Snake
-initSnake = (R, [(2, 1), (1, 1), (0, 1)])
+initSnake = (R, [(2, 1), (2, 2), (3, 2), (3, 1), (4, 1)])
 
-positionSnakeOnBoard :: Board -> Snake -> Board
-positionSnakeOnBoard board@(Board (width, height, spaces)) snake@(_, parts) =
+positionSnakeOnBoard :: Game -> Board
+positionSnakeOnBoard (board@(Board (width, height, spaces)), snake@(_, parts)) =
     let lst = snakePositionsMap (board, snake)
      in Board
             ( width
@@ -155,14 +155,19 @@ generateFood (board@(Board (width, height, spaces)), snake@(_, head:body)) = do
         else generateFood (board, snake)
 
 update :: Game -> IO ()
-update (board@(Board (width, height, spaces)), snake) = do
+update (board@(Board (width, height, spaces)), snake@(dir, parts)) = do
     system "clear"
-    print $ positionSnakeOnBoard board snake
+    print $ positionSnakeOnBoard (board, snake)
     threadDelay 100000
-    let newSnake@(_, snakeHead:body) = updateSnake (board, snake) False
+    let newSnake@(_, snakeHead:_) = updateSnake (board, snake) False
         headPosition = partPosition snakeHead
-        spaceAtHead = spaces !! headPosition
+        fullSpaces = s
+          where
+            b@(Board (_, _, s)) =
+                positionSnakeOnBoard (board, (dir, init parts))
+        spaceAtHead = fullSpaces !! headPosition
     newBoard <- generateFood (board, newSnake)
+    print $ spaceAtHead
     case spaceAtHead of
         Wall -> fail "Snake hit wall"
         Body -> fail "Snake hit body"
