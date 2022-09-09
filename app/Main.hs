@@ -74,7 +74,7 @@ initSnake = (R, [(2, 1), (1, 1), (0, 1)])
 
 positionSnakeOnBoard :: Board -> Snake -> Board
 positionSnakeOnBoard board@(Board (width, height, spaces)) snake@(_, parts) =
-    let lst = snakePositionsMap board snake
+    let lst = snakePositionsMap (board, snake)
      in Board
             ( width
             , height
@@ -131,8 +131,8 @@ replaceNth n newVal (x:xs)
 partPosition :: Part -> Int
 partPosition (x, y) = x + y * gWidth
 
-snakePositionsMap :: Board -> Snake -> [(Int, Bool)]
-snakePositionsMap (Board (width, height, _)) (_, body) =
+snakePositionsMap :: Game -> [(Int, Bool)]
+snakePositionsMap ((Board (width, height, _)), (_, body)) =
     map (\(x, y) -> (x + y * width, True)) body
 
 isOutOfBounds :: Game -> Bool
@@ -159,7 +159,6 @@ update (board@(Board (width, height, spaces)), snake) = do
     system "clear"
     print $ positionSnakeOnBoard board snake
     threadDelay 100000
-    g <- newStdGen
     let newSnake@(_, snakeHead:body) = updateSnake (board, snake) False
         headPosition = partPosition snakeHead
         spaceAtHead = spaces !! headPosition
