@@ -92,12 +92,13 @@ applyMove board@(Board (width, height, _)) dir (x, y) = (x + dx, y + dy)
   where
     (dx, dy) = directionToMove dir
 
-updateSnake :: Game -> Snake
-updateSnake (board, (dir, body)) =
-    (dir, (applyMove board dir (head body)) : (init body))
-
-growSnake :: Game -> Snake
-growSnake (board, (dir, body)) = (dir, (applyMove board dir (head body)) : body)
+updateSnake :: Game -> Bool -> Snake
+updateSnake (board, (dir, body)) grow =
+    ( dir
+    , (applyMove board dir (head body)) :
+      (if grow
+           then body
+           else init body))
 
 changeDirection :: Snake -> Int -> Snake
 changeDirection (currentDir, body) change =
@@ -122,20 +123,24 @@ snakePositionsMap :: Board -> Snake -> [(Int, Bool)]
 snakePositionsMap (Board (width, height, _)) (_, body) =
     map (\(x, y) -> (x + y * width, True)) body
 
+isOutOfBounds :: Game -> Bool
+isOutOfBounds ((Board (width, height, _)), (_, (x, y):_)) =
+    x < 0 || y < 0 || x >= width || y >= height
+
 update :: Game -> IO ()
 update (board@(Board (width, height, spaces)), snake) = do
     print $ positionSnakeOnBoard board snake
-    let newSnake@(dir, snakeHead@(x, y):body) = updateSnake (board, snake)
+    let newSnake@(dir, snakeHead@(x, y):body) = updateSnake (board, snake) False
         headPosition = partPosition snakeHead
-    if x < 0 || y < 0 || x >= width || y >= height
+        spaceAtHead = spaces !! headPosition
+        gotFood = spaceAtHead == Food
+    if isOutOfBounds (board, newSnake)
         then fail "Snake hit wall"
-        else if (spaces !! headPosition) == Body
+        else if (spaceAtHead) == Body
                  then fail "Snake hit body"
-                 else if (spaces !! headPosition) == Food
-                          then update
-                                   ( Board
-                                         ( width
-                                         , height
-                                         , replaceNth headPosition Empty spaces)
-                                   , (growSnake (board, snake)))
-                          else update (board, (newSnake))
+                 else update
+                          ( Board
+                                ( width
+                                , height
+                                , replaceNth headPosition Empty spaces)
+                          , (updateSnake (board, snake) gotFood))
