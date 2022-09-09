@@ -45,13 +45,15 @@ data Space
     | Food
     | Body
     | Head
+    | Wall
     deriving (Eq)
 
 instance Show Space where
     show Empty = " "
     show Food = "*"
-    show Body = "+"
-    show Head = "#"
+    show Body = "B"
+    show Wall = "#"
+    show Head = "H"
 
 type Game = (Board, Snake)
 
@@ -60,11 +62,15 @@ initBoard width height =
     Board
         ( width
         , height
-        , (replaceNth 9 Food . replaceNth 6 Food)
-              ((replicate (width * height) Empty)))
+        , (replaceNth (width + 9) Food . replaceNth (width + 6) Food)
+              (replicate width Wall ++
+               concat (replicate (height - 2) innerSegment)) ++
+          replicate width Wall)
+  where
+    innerSegment = [Wall] ++ replicate (width - 2) Empty ++ [Wall]
 
 initSnake :: Snake
-initSnake = (R, [(2, 0), (1, 0), (0, 0)])
+initSnake = (R, [(2, 1), (1, 1), (0, 1)])
 
 positionSnakeOnBoard :: Board -> Snake -> Board
 positionSnakeOnBoard board@(Board (width, height, spaces)) snake@(_, parts) =
@@ -133,32 +139,33 @@ isOutOfBounds :: Game -> Bool
 isOutOfBounds ((Board (width, height, _)), (_, (x, y):_)) =
     x < 0 || y < 0 || x >= width || y >= height
 
+generateFood :: Game -> IO Board
+generateFood (board@(Board (width, height, spaces)), snake@(_, head:body)) = do
+    g <- newStdGen
+    let position = fst $ randomR (0, width * height - 1) g
+        headPosition = partPosition head
+        matchPosition = spaces !! position
+    if matchPosition == Empty && not (position == headPosition)
+        then return $
+             Board
+                 ( width
+                 , height
+                 , (replaceNth position Food . replaceNth headPosition Empty)
+                       spaces)
+        else generateFood (board, snake)
+
 update :: Game -> IO ()
 update (board@(Board (width, height, spaces)), snake) = do
     system "clear"
     print $ positionSnakeOnBoard board snake
     threadDelay 100000
     g <- newStdGen
-    let newSnake@(dir, snakeHead@(x, y):body) = updateSnake (board, snake) False
+    let newSnake@(_, snakeHead:body) = updateSnake (board, snake) False
         headPosition = partPosition snakeHead
         spaceAtHead = spaces !! headPosition
-        gotFood = spaceAtHead == Food
-    if isOutOfBounds (board, newSnake)
-        then fail "Snake hit wall"
-        else if (spaceAtHead) == Body
-                 then fail "Snake hit body"
-                 else update
-                          ( Board
-                                ( width
-                                , height
-                                , ((if gotFood
-                                        then replaceNth
-                                                 (fst $
-                                                  randomR
-                                                      (0, width * height - 1)
-                                                      g)
-                                                 Food
-                                        else id) .
-                                   replaceNth headPosition Empty)
-                                      spaces)
-                          , (updateSnake (board, snake) gotFood))
+    newBoard <- generateFood (board, newSnake)
+    case spaceAtHead of
+        Wall -> fail "Snake hit wall"
+        Body -> fail "Snake hit body"
+        Empty -> update (board, (updateSnake (board, snake) False))
+        Food -> update (newBoard, (updateSnake (board, snake) True))
