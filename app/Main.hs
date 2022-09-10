@@ -4,6 +4,7 @@ import Control.Concurrent (threadDelay)
 import Control.Monad (forM_, when)
 import Data.List.Split (chunksOf)
 import System.Console.ANSI
+import System.IO (hFlush, stdout)
 import System.Process (system)
 import System.Random
 
@@ -168,7 +169,9 @@ redraw currentBoard (Board (width, _, spaces)) = do
         when
             ([(currentBoard !! (index + y + x + y * (width - 1)))] /= show space) $ do
             setCursorPosition y (x * 2)
-            putStrLn $ show space
+            putStr $ show space
+            setCursorPosition 0 0
+            hFlush stdout
 
 update :: Game -> Board -> IO ()
 update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = do
