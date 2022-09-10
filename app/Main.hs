@@ -31,6 +31,9 @@ type Part = (Int, Int)
 newtype Board =
     Board (Int, Int, [Space])
 
+getSpaces :: Board -> [Space]
+getSpaces (Board (_, _, s)) = s
+
 instance Show Board where
     show (Board (width, height, spaces)) =
         replicate (width * 2 + 1) '-' ++
@@ -70,7 +73,7 @@ initBoard width height =
     innerSegment = [Wall] ++ replicate (width - 2) Empty ++ [Wall]
 
 initSnake :: Snake
-initSnake = (R, [(2, 1), (2, 2), (3, 2), (3, 1), (4, 1)])
+initSnake = (R, [(3, 1), (2, 1), (1, 1)])
 
 positionSnakeOnBoard :: Game -> Board
 positionSnakeOnBoard (board@(Board (width, height, spaces)), snake@(_, parts)) =
@@ -140,12 +143,13 @@ isOutOfBounds ((Board (width, height, _)), (_, (x, y):_)) =
     x < 0 || y < 0 || x >= width || y >= height
 
 generateFood :: Game -> IO Board
-generateFood (board@(Board (width, height, spaces)), snake@(_, head:body)) = do
+generateFood (board@(Board (width, height, spaces)), snake@(dir, parts@(head:body))) = do
     g <- newStdGen
     let position = fst $ randomR (0, width * height - 1) g
         headPosition = partPosition head
-        matchPosition = spaces !! position
-    if matchPosition == Empty && not (position == headPosition)
+        fullSpaces = getSpaces $ positionSnakeOnBoard (board, (dir, init parts))
+        matchPosition = fullSpaces !! position
+    if matchPosition == Empty
         then return $
              Board
                  ( width
@@ -161,13 +165,9 @@ update (board@(Board (width, height, spaces)), snake@(dir, parts)) = do
     threadDelay 100000
     let newSnake@(_, snakeHead:_) = updateSnake (board, snake) False
         headPosition = partPosition snakeHead
-        fullSpaces = s
-          where
-            b@(Board (_, _, s)) =
-                positionSnakeOnBoard (board, (dir, init parts))
+        fullSpaces = getSpaces $ positionSnakeOnBoard (board, (dir, init parts))
         spaceAtHead = fullSpaces !! headPosition
     newBoard <- generateFood (board, newSnake)
-    print $ spaceAtHead
     case spaceAtHead of
         Wall -> fail "Snake hit wall"
         Body -> fail "Snake hit body"
