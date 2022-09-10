@@ -1,7 +1,9 @@
 module Main where
 
 import Control.Concurrent (threadDelay)
+import Control.Monad (forM_, when)
 import Data.List.Split (chunksOf)
+import System.Console.ANSI
 import System.Process (system)
 import System.Random
 
@@ -9,7 +11,9 @@ main :: IO ()
 main = do
     let board = initBoard gWidth gHeight
         snake = initSnake
-    update (board, snake)
+    system "clear"
+    print $ board
+    update (board, snake) board
 
 gWidth :: Int
 gWidth = 20
@@ -26,6 +30,9 @@ data Direction
 
 type Snake = (Direction, [Part])
 
+getHead :: Snake -> Part
+getHead (_, (x:xs)) = x
+
 type Part = (Int, Int)
 
 newtype Board =
@@ -36,12 +43,7 @@ getSpaces (Board (_, _, s)) = s
 
 instance Show Board where
     show (Board (width, height, spaces)) =
-        replicate (width * 2 + 1) '-' ++
-        "\n" ++
-        (unlines .
-         map (\i -> "|" ++ i ++ "|") . map unwords . chunksOf width . map show)
-            spaces ++
-        replicate (width * 2 + 1) '-'
+        (unlines . map unwords . chunksOf width . map show) spaces
 
 data Space
     = Empty
@@ -158,18 +160,30 @@ generateFood (board@(Board (width, height, spaces)), snake@(dir, parts@(head:bod
                        spaces)
         else generateFood (board, snake)
 
-update :: Game -> IO ()
-update (board@(Board (width, height, spaces)), snake@(dir, parts)) = do
-    system "clear"
-    print $ positionSnakeOnBoard (board, snake)
+redraw :: String -> Board -> IO ()
+redraw currentBoard (Board (width, _, spaces)) = do
+    forM_ (zip [0 ..] spaces) $ \(index, space) -> do
+        let (y, x) = index `divMod` width
+        -- Index calculation for currentBoard uses newLine characters and the added whitespace for clarityy
+        when
+            ([(currentBoard !! (index + y + x + y * (width - 1)))] /= show space) $ do
+            setCursorPosition y (x * 2)
+            putStrLn $ show space
+
+update :: Game -> Board -> IO ()
+update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = do
+    let displayBoard = positionSnakeOnBoard (board, snake)
+    redraw (show lastBoard) displayBoard
     threadDelay 100000
-    let newSnake@(_, snakeHead:_) = updateSnake (board, snake) False
-        headPosition = partPosition snakeHead
+    let newSnakeGen = updateSnake (board, snake)
+        movedSnake = newSnakeGen False
+        grownSnake = newSnakeGen True
+        headPosition = partPosition (getHead $ movedSnake)
         fullSpaces = getSpaces $ positionSnakeOnBoard (board, (dir, init parts))
         spaceAtHead = fullSpaces !! headPosition
-    newBoard <- generateFood (board, newSnake)
+    newBoard <- generateFood (board, grownSnake)
     case spaceAtHead of
-        Wall -> fail "Snake hit wall"
-        Body -> fail "Snake hit body"
-        Empty -> update (board, (updateSnake (board, snake) False))
-        Food -> update (newBoard, (updateSnake (board, snake) True))
+        Wall -> system "clear" >> fail "Snake hit wall"
+        Body -> system "clear" >> fail "Snake hit body"
+        Empty -> update (board, movedSnake) displayBoard
+        Food -> update (newBoard, grownSnake) displayBoard

@@ -29,6 +29,6 @@ executable Snake
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-    build-depends:    base ^>=4.16.1.0, split, process, random
+    build-depends:    base ^>=4.16.1.0, split, process, random, ansi-terminal
     hs-source-dirs:   app
     default-language: Haskell2010
