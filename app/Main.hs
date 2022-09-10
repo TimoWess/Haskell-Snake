@@ -12,15 +12,17 @@ main :: IO ()
 main = do
     let board = initBoard gWidth gHeight
         snake = initSnake
+    initFoodBoard <- generateFood (board, snake)
+    initFoodBoard2 <- generateFood (initFoodBoard, snake)
     system "clear"
-    print $ board
-    update (board, snake) board
+    print initFoodBoard2
+    update (initFoodBoard2, snake) initFoodBoard2
 
 gWidth :: Int
-gWidth = 20
+gWidth = 30
 
 gHeight :: Int
-gHeight = 20
+gHeight = 30
 
 data Direction
     = U
@@ -50,16 +52,19 @@ data Space
     = Empty
     | Food
     | Body
-    | Head
+    | Head Direction
     | Wall
     deriving (Eq)
 
 instance Show Space where
     show Empty = " "
     show Food = "*"
-    show Body = "B"
+    show Body = "+"
     show Wall = "#"
-    show Head = "H"
+    show (Head U) = "^"
+    show (Head R) = ">"
+    show (Head D) = "v"
+    show (Head L) = "<"
 
 type Game = (Board, Snake)
 
@@ -68,9 +73,8 @@ initBoard width height =
     Board
         ( width
         , height
-        , (replaceNth (width + 9) Food . replaceNth (width + 6) Food)
-              (replicate width Wall ++
-               concat (replicate (height - 2) innerSegment)) ++
+          -- (replaceNth (width + 9) Food . replaceNth (width + 6) Food)
+        , (replicate width Wall ++ concat (replicate (height - 2) innerSegment)) ++
           replicate width Wall)
   where
     innerSegment = [Wall] ++ replicate (width - 2) Empty ++ [Wall]
@@ -79,7 +83,7 @@ initSnake :: Snake
 initSnake = (R, [(3, 1), (2, 1), (1, 1)])
 
 positionSnakeOnBoard :: Game -> Board
-positionSnakeOnBoard (board@(Board (width, height, spaces)), snake@(_, parts)) =
+positionSnakeOnBoard (board@(Board (width, height, spaces)), snake@(dir, parts)) =
     let lst = snakePositionsMap (board, snake)
      in Board
             ( width
@@ -90,7 +94,7 @@ positionSnakeOnBoard (board@(Board (width, height, spaces)), snake@(_, parts)) =
                         in (if maybe False id isSnake
                                 then if index ==
                                         (\(x, y) -> x + y * width) (head parts)
-                                         then Head
+                                         then Head dir
                                          else Body
                                 else space) :
                            akk)
