@@ -10,18 +10,13 @@ import System.Random
 
 main :: IO ()
 main = do
-    let board = initBoard gWidth gHeight
-        snake = initSnake
-    newBoard <- generateFood (board, snake) >>= (\i -> generateFood (i, snake))
+    let width = 30
+        height = 30
+        initGame = (initBoard width height, initSnake)
+    startingGame@(board, _) <- generateFood initGame >>= generateFood
     system "clear"
-    print newBoard
-    update (newBoard, snake) newBoard
-
-gWidth :: Int
-gWidth = 30
-
-gHeight :: Int
-gHeight = 30
+    print board
+    update startingGame board
 
 data Direction
     = U
@@ -72,7 +67,6 @@ initBoard width height =
     Board
         ( width
         , height
-          -- (replaceNth (width + 9) Food . replaceNth (width + 6) Food)
         , (replicate width Wall ++ concat (replicate (height - 2) innerSegment)) ++
           replicate width Wall)
   where
@@ -140,8 +134,9 @@ replaceNth n newVal (x:xs)
     | n == 0 = newVal : xs
     | otherwise = x : replaceNth (n - 1) newVal xs
 
-partPosition :: Part -> Int
-partPosition (x, y) = x + y * gWidth
+-- partPosition needs the width of the board as it's first argument
+partPosition :: Int -> Part -> Int
+partPosition width (x, y) = x + y * width
 
 snakePositionsMap :: Game -> [(Int, Bool)]
 snakePositionsMap ((Board (width, height, _)), (_, body)) =
@@ -151,20 +146,21 @@ isOutOfBounds :: Game -> Bool
 isOutOfBounds ((Board (width, height, _)), (_, (x, y):_)) =
     x < 0 || y < 0 || x >= width || y >= height
 
-generateFood :: Game -> IO Board
+generateFood :: Game -> IO Game
 generateFood (board@(Board (width, height, spaces)), snake@(dir, parts@(head:body))) = do
     g <- newStdGen
     let position = fst $ randomR (0, width * height - 1) g
-        headPosition = partPosition head
+        headPosition = partPosition width head
         fullSpaces = getSpaces $ positionSnakeOnBoard (board, (dir, init parts))
         matchPosition = fullSpaces !! position
     if matchPosition == Empty
         then return $
-             Board
-                 ( width
-                 , height
-                 , (replaceNth position Food . replaceNth headPosition Empty)
-                       spaces)
+             ( Board
+                   ( width
+                   , height
+                   , (replaceNth position Food . replaceNth headPosition Empty)
+                         spaces)
+             , snake)
         else generateFood (board, snake)
 
 redraw :: String -> Board -> IO ()
@@ -198,12 +194,12 @@ update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = d
         nextDir = newDir dir input
         movedSnake = newSnakeGen False
         grownSnake = newSnakeGen True
-        headPosition = partPosition (getHead $ movedSnake)
+        headPosition = partPosition width (getHead $ movedSnake)
         fullSpaces = getSpaces $ positionSnakeOnBoard (board, (dir, init parts))
         spaceAtHead = fullSpaces !! headPosition
-    newBoard <- generateFood (board, grownSnake)
+    boardWithNewFood <- generateFood (board, grownSnake)
     case spaceAtHead of
         Wall -> system "clear" >> fail "Snake hit wall"
         Body -> system "clear" >> fail "Snake hit body"
         Empty -> update (board, movedSnake) displayBoard
-        Food -> update (newBoard, grownSnake) displayBoard
+        Food -> update boardWithNewFood displayBoard
