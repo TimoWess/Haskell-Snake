@@ -12,11 +12,10 @@ main :: IO ()
 main = do
     let board = initBoard gWidth gHeight
         snake = initSnake
-    initFoodBoard <- generateFood (board, snake)
-    initFoodBoard2 <- generateFood (initFoodBoard, snake)
+    newBoard <- generateFood (board, snake) >>= (\i -> generateFood (i, snake))
     system "clear"
-    print initFoodBoard2
-    update (initFoodBoard2, snake) initFoodBoard2
+    print newBoard
+    update (newBoard, snake) newBoard
 
 gWidth :: Int
 gWidth = 30
@@ -182,15 +181,12 @@ redraw currentBoard (Board (width, _, spaces)) = do
 
 newDir :: Direction -> String -> Direction
 newDir dir i
-    | i == "a" =
-        toEnum $
-        if (dirNum - 1) < 0
-            then 3
-            else dirNum - 1
-    | i == "d" = toEnum $ (dirNum + 1) `mod` 4
+    | i == "a" = toEnum $ m4 (dirNum - 1 + 4)
+    | i == "d" = toEnum $ m4 (dirNum + 1)
     | otherwise = dir
   where
     dirNum = fromEnum dir
+    m4 = (`mod` 4)
 
 update :: Game -> Board -> IO ()
 update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = do
