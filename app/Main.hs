@@ -82,6 +82,9 @@ initBoard width height =
 initSnake :: Snake
 initSnake = (R, [(3, 1), (2, 1), (1, 1)])
 
+setDir :: Snake -> Direction -> Snake
+setDir (dir, parts) newDir = (newDir, parts)
+
 positionSnakeOnBoard :: Game -> Board
 positionSnakeOnBoard (board@(Board (width, height, spaces)), snake@(dir, parts)) =
     let lst = snakePositionsMap (board, snake)
@@ -177,12 +180,26 @@ redraw currentBoard (Board (width, _, spaces)) = do
             setCursorPosition 0 0
             hFlush stdout
 
+newDir :: Direction -> String -> Direction
+newDir dir i
+    | i == "a" =
+        toEnum $
+        if (dirNum - 1) < 0
+            then 3
+            else dirNum - 1
+    | i == "d" = toEnum $ (dirNum + 1) `mod` 4
+    | otherwise = dir
+  where
+    dirNum = fromEnum dir
+
 update :: Game -> Board -> IO ()
 update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = do
     let displayBoard = positionSnakeOnBoard (board, snake)
     redraw (show lastBoard) displayBoard
-    threadDelay 100000
-    let newSnakeGen = updateSnake (board, snake)
+    -- threadDelay 100000
+    input <- getLine
+    let newSnakeGen = updateSnake (board, setDir snake nextDir)
+        nextDir = newDir dir input
         movedSnake = newSnakeGen False
         grownSnake = newSnakeGen True
         headPosition = partPosition (getHead $ movedSnake)
