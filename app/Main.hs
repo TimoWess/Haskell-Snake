@@ -4,7 +4,7 @@ import Control.Concurrent (threadDelay)
 import Control.Monad (forM_, when)
 import Data.List.Split (chunksOf)
 import System.Console.ANSI
-import System.IO (hFlush, stdout)
+import System.IO
 import System.Process (system)
 import System.Random
 
@@ -13,6 +13,7 @@ main = do
     let board = initBoard gWidth gHeight
         snake = initSnake
     newBoard <- generateFood (board, snake) >>= (\i -> generateFood (i, snake))
+    hSetBuffering stdin NoBuffering
     system "clear"
     print newBoard
     update (newBoard, snake) newBoard
@@ -177,12 +178,14 @@ redraw currentBoard (Board (width, _, spaces)) = do
             setCursorPosition y (x * 2)
             putStr $ show space
             setCursorPosition 0 0
+            putStr $ "#"
+            setCursorPosition 0 0
             hFlush stdout
 
 newDir :: Direction -> String -> Direction
 newDir dir i
-    | i == "a" = toEnum $ m4 (dirNum - 1 + 4)
-    | i == "d" = toEnum $ m4 (dirNum + 1)
+    | head i == 'a' = toEnum $ m4 (dirNum - 1 + 4)
+    | head i == 'd' = toEnum $ m4 (dirNum + 1)
     | otherwise = dir
   where
     dirNum = fromEnum dir
@@ -192,10 +195,10 @@ update :: Game -> Board -> IO ()
 update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = do
     let displayBoard = positionSnakeOnBoard (board, snake)
     redraw (show lastBoard) displayBoard
-    -- threadDelay 100000
-    input <- getLine
+    isInput <- hWaitForInput stdin 100
+    input <- getInput isInput
     let newSnakeGen = updateSnake (board, setDir snake nextDir)
-        nextDir = newDir dir input
+        nextDir = newDir dir [input]
         movedSnake = newSnakeGen False
         grownSnake = newSnakeGen True
         headPosition = partPosition (getHead $ movedSnake)
@@ -207,3 +210,6 @@ update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = d
         Body -> system "clear" >> fail "Snake hit body"
         Empty -> update (board, movedSnake) displayBoard
         Food -> update (newBoard, grownSnake) displayBoard
+
+getInput True = getChar
+getInput False = return ' '
