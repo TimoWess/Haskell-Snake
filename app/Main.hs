@@ -164,17 +164,15 @@ generateFood (board@(Board (width, height, spaces)), snake@(dir, parts@(head:bod
              , snake)
         else generateFood (board, snake)
 
-redraw :: String -> Board -> IO ()
-redraw currentBoard (Board (width, _, spaces)) = do
-    forM_ (zip [0 ..] spaces) $ \(index, space) -> do
+redraw :: Board -> Board -> IO ()
+redraw currentBoard@(Board (_, _, currentSpaces)) nextBoard@(Board (width, _, spaces)) = do
+    let zippedSpaces = zip currentSpaces spaces
+        indexedSpaces = zip [0 ..] zippedSpaces
+    forM_ indexedSpaces $ \(index, (currentSpace, nextSpace)) -> do
         let (y, x) = index `divMod` width
-        -- Index calculation for currentBoard uses newLine characters and the added whitespace for clarityy
-        when
-            ([(currentBoard !! (index + y + x + y * (width - 1)))] /= show space) $ do
-            setCursorPosition y (x * 2)
-            putStr $ show space
-            setCursorPosition 0 0
-            putStr $ "#"
+        when (currentSpace /= nextSpace) $ do
+            setCursorPosition y (x * 2) -- x*2 since every horizontal space is two characters
+            putStr $ show nextSpace
             setCursorPosition 0 0
             hFlush stdout
 
@@ -190,7 +188,7 @@ newDir dir i
 update :: Game -> Board -> IO ()
 update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = do
     let displayBoard = positionSnakeOnBoard (board, snake)
-    redraw (show lastBoard) displayBoard
+    redraw lastBoard displayBoard
     isInput <- hWaitForInput stdin 100
     input <- getInput isInput
     let newSnakeGen = updateSnake (board, setDir snake nextDir)
@@ -207,5 +205,6 @@ update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = d
         Empty -> update (board, movedSnake) displayBoard
         Food -> update boardWithNewFood displayBoard
 
+getInput :: Bool -> IO Char
 getInput True = getChar
 getInput False = return ' '
