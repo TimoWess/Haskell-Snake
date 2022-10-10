@@ -3,6 +3,7 @@ module Main where
 import Control.Concurrent (threadDelay)
 import Control.Monad (forM_, when)
 import Data.List.Split (chunksOf)
+import Data.Maybe (fromMaybe)
 import System.Console.ANSI
 import System.IO
 import System.Process (system)
@@ -29,7 +30,7 @@ data Direction
 type Snake = (Direction, [Part])
 
 getHead :: Snake -> Part
-getHead (_, (x:xs)) = x
+getHead (_, x:xs) = x
 
 type Part = (Int, Int)
 
@@ -88,7 +89,7 @@ positionSnakeOnBoard (board@(Board (width, height, spaces)), snake@(dir, parts))
             , foldr
                   (\(space, index) akk ->
                        let isSnake = lookup index lst
-                        in (if maybe False id isSnake
+                        in (if fromMaybe False isSnake
                                 then if index ==
                                         (\(x, y) -> x + y * width) (head parts)
                                          then Head dir
@@ -114,7 +115,7 @@ applyMove board@(Board (width, height, _)) dir (x, y) = (x + dx, y + dy)
 updateSnake :: Game -> Bool -> Snake
 updateSnake (board, (dir, body)) grow =
     ( dir
-    , (applyMove board dir (head body)) :
+    , applyMove board dir (head body) :
       (if grow
            then body
            else init body))
@@ -140,11 +141,11 @@ partPosition :: Int -> Part -> Int
 partPosition width (x, y) = x + y * width
 
 snakePositionsMap :: Game -> [(Int, Bool)]
-snakePositionsMap ((Board (width, height, _)), (_, body)) =
+snakePositionsMap (Board (width, height, _), (_, body)) =
     map (\(x, y) -> (x + y * width, True)) body
 
 isOutOfBounds :: Game -> Bool
-isOutOfBounds ((Board (width, height, _)), (_, (x, y):_)) =
+isOutOfBounds (Board (width, height, _), (_, (x, y):_)) =
     x < 0 || y < 0 || x >= width || y >= height
 
 generateFood :: Game -> IO Game
@@ -155,13 +156,14 @@ generateFood (board@(Board (width, height, spaces)), snake@(dir, parts@(head:bod
         fullSpaces = getSpaces $ positionSnakeOnBoard (board, (dir, init parts))
         matchPosition = fullSpaces !! position
     if matchPosition == Empty
-        then return $
-             ( Board
-                   ( width
-                   , height
-                   , (replaceNth position Food . replaceNth headPosition Empty)
-                         spaces)
-             , snake)
+        then return
+                 ( Board
+                       ( width
+                       , height
+                       , (replaceNth position Food .
+                          replaceNth headPosition Empty)
+                             spaces)
+                 , snake)
         else generateFood (board, snake)
 
 redraw :: Board -> Board -> IO ()
@@ -195,7 +197,7 @@ update (board@(Board (width, height, spaces)), snake@(dir, parts)) lastBoard = d
         nextDir = newDir dir [input]
         movedSnake = newSnakeGen False
         grownSnake = newSnakeGen True
-        headPosition = partPosition width (getHead $ movedSnake)
+        headPosition = partPosition width (getHead movedSnake)
         fullSpaces = getSpaces $ positionSnakeOnBoard (board, (dir, init parts))
         spaceAtHead = fullSpaces !! headPosition
     boardWithNewFood <- generateFood (board, grownSnake)
